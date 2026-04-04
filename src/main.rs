@@ -45,7 +45,7 @@ fn get_variation_series<T: PartialEq + Copy>(array: &Vec<T>) -> Result<Vec<(T, u
     if array.is_empty() {
         return Err("array is empty".to_string().into());
     }
-    
+
     let mut result = Vec::new();
     let mut current = array[0];
     let mut count = 1;
@@ -66,43 +66,61 @@ fn get_variation_series<T: PartialEq + Copy>(array: &Vec<T>) -> Result<Vec<(T, u
 
 use terminal_size::{Width, terminal_size};
 
+fn print_variation_graph(data: &[f64], intervals: usize) {
+    if data.is_empty() { return; }
 
-fn print_variation_graph<T: std::fmt::Display>(series: &[(T, usize)]) {
-    let term_width = if let Some((Width(w), _)) = terminal_size() {
-        w as usize
-    } else {
-        80 // Значение по умолчанию, если терминал не определен
-    };
+    let min = data[0];
+    let max = data[data.len() - 1];
+    let range = max - min;
+    let step = if range == 0.0 { 1.0 } else { range / intervals as f64 };
 
-    let col_width = 5;
-    let axis_width = 5;
-    let chunk_size = (term_width - axis_width) / col_width;
-
-    if chunk_size == 0 { return; }
-
-    for chunk in series.chunks(chunk_size) {
-        let max_count = chunk.iter().map(|&(_, count)| count).max().unwrap_or(0);
-
-        for level in (1..=max_count).rev() {
-            print!("{:>2} │ ", level);
-            for &(_, count) in chunk {
-                if count >= level { print!("  █  "); } else { print!("     "); }
-            }
-            println!();
-        }
-
-        print!("   └{}", "─────".repeat(chunk.len()));
-        print!("\n     ");
-        for (val, _) in chunk { print!("{:^5}", val); }
-        println!("\n");
+    // 1. Считаем частоты
+    let mut counts = vec![0; intervals];
+    for &x in data {
+        let mut idx = ((x - min) / step).floor() as usize;
+        if idx >= intervals { idx = intervals - 1; }
+        counts[idx] += 1;
     }
+
+    let max_count = *counts.iter().max().unwrap_or(&0);
+
+    // 2. Рисуем столбцы
+    for level in (1..=max_count).rev() {
+        print!("{:>2} │", level);
+        for &count in &counts {
+            if count >= level { print!("  █  "); } else { print!("     "); }
+        }
+        println!();
+    }
+
+    // 3. Рисуем ось
+    println!("   └{}", "─────".repeat(intervals));
+
+    // 4. Печатаем только Min и Max под крайними столбцами
+    let min_str = format!("{:.1}", min);
+    let max_str = format!("{:.1}", max);
+
+    print!("     "); // Отступ оси Y
+    
+    // Печатаем Min под первым столбцом (центрировано в 5 символах)
+    print!("{:^5}", min_str);
+
+    // Печатаем пробелы до последнего столбца
+    if intervals > 1 {
+        print!("{}", "     ".repeat(intervals - 2));
+        // Печатаем Max под последним столбцом
+        print!("{:^5}", max_str);
+    }
+    
+    println!("\n");
 }
 
 
 
 
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut stat = Vec::new();  // Vec<f64> - одномерный вектор
+    let mut stat = Vec::new();
     let args: Vec<String> = env::args().collect();
     
     if args.len() > 1 {
@@ -114,14 +132,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Need file path as argument".to_string().into());
     }
     
-    // Сортируем данные
+    // 1. Сортируем данные (обязательно для корректного поиска min/max)
     insert_sort(&mut stat)?;
     
-    // Строим вариационный ряд из уже отсортированных данных
-    let series = get_variation_series(&stat)?;
-    
-    // Выводим график
-    print_variation_graph(&series);
+    // 2. Выводим график, передавая исходный вектор чисел и количество интервалов
+    // get_variation_series больше не нужен для этой функции
+    print_variation_graph(&stat, 20);
 
     Ok(())
 }
