@@ -1,0 +1,8 @@
+[package]
+name = "RO5"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fs = "0.0.5"
+terminal_size = "0.3"
